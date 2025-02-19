@@ -235,12 +235,14 @@ export const getUserInfo: RequestHandler<{ uid: string }> = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    const user = await User.findOne({ uid: req.params.uid });
+    const user = await User.findOne({ uid: req.params.uid }).populate(
+      "subscription"
+    );
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
     }
-
+    console.log(user);
     res.status(200).json(user);
     return;
   } catch (error) {

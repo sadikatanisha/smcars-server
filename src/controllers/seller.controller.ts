@@ -3,6 +3,7 @@ import Car from "../models/Car";
 import cloudinary from "../config/cloudinary";
 import User from "../models/User";
 import mongoose from "mongoose";
+import Auction from "../models/Auction";
 
 // @desc    Create car
 // @route   POST /api/seller/create-car
@@ -13,7 +14,7 @@ export const createCar = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
-  const session = await mongoose.startSession(); // Start a session for transactions
+  const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
@@ -97,7 +98,7 @@ export const createCar = async (
 
 // @desc    Get cars by seller
 // @route   GET /api/seller/my-cars
-// @access  Public
+// @access  Private
 
 export const getMyCars = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -129,5 +130,108 @@ export const getMyCars = async (req: Request, res: Response): Promise<void> => {
         .status(500)
         .json({ success: false, message: "An unknown error occurred" });
     }
+  }
+};
+
+// @desc    Get car listing limit by seller
+// Helper function
+
+export const checkListingLimit = async (
+  userId: string
+): Promise<{ remaining: number; limit: number; used: number }> => {
+  // Fetch the user and populate the subscription details
+  const user = await User.findById(userId).populate("subscription");
+  if (!user || user.role !== "seller") {
+    throw new Error("User not found or not a seller");
+  }
+
+  if (!user.subscription) {
+    throw new Error("No subscription assigned to the user");
+  }
+
+  // Extract the listing limit from the subscription details
+  const listingLimit = (user.subscription as any).carListingLimit;
+  if (listingLimit === undefined) {
+    throw new Error("Listing limit not defined in subscription");
+  }
+
+  if (!user.subscriptionRenewalDate) {
+    throw new Error("Subscription renewal date not set");
+  }
+
+  // Count how many cars were listed since the subscriptionRenewalDate
+  const currentCount = await Car.countDocuments({
+    sellerId: user._id,
+    createdAt: { $gte: user.subscriptionRenewalDate },
+  });
+
+  const remaining = listingLimit - currentCount;
+
+  return { remaining, limit: listingLimit, used: currentCount };
+};
+
+// @desc    Create Auction for Car
+// @route   POST /api/seller/create-auction
+// @access  Private
+
+export const createAuction = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { car, seller, startTime, endTime, reservePrice } = req.body;
+
+    // Validate required fields
+    if (!car || !seller || !startTime || !endTime || !reservePrice) {
+      res.status(400).json({ message: "Missing required fields" });
+      return;
+    }
+
+    // Check if there's an existing auction for this car that is scheduled or active
+    const existingAuction = await Auction.findOne({
+      car,
+      seller,
+      status: { $in: ["scheduled", "active"] },
+    });
+
+    if (existingAuction) {
+      res
+        .status(400)
+        .json({ message: "An auction already exists for this car" });
+      return;
+    }
+
+    // Verify the car exists, belongs to the seller, and is approved for auction
+    const carData = await Car.findById(car);
+    if (!carData) {
+      res.status(404).json({ message: "Car not found" });
+      return;
+    }
+    if (carData.sellerId.toString() !== seller) {
+      res
+        .status(403)
+        .json({ message: "Unauthorized: Car does not belong to seller" });
+      return;
+    }
+    if (carData.status !== "approved") {
+      res.status(400).json({ message: "Car is not approved for auction" });
+      return;
+    }
+
+    // Create and save the new auction
+    const auction = new Auction({
+      car,
+      seller,
+      startTime,
+      endTime,
+      reservePrice,
+      status: "scheduled", // initial status
+    });
+    const savedAuction = await auction.save();
+    res.status(201).json(savedAuction);
+  } catch (error: unknown) {
+    res
+      .status(500)
+      .json({ success: false, message: "An unknown error occurred" });
   }
 };

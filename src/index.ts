@@ -11,6 +11,8 @@ import subscriptionRoute from "./routes/subscription.route";
 import adminRoute from "./routes/admin.route";
 dotenv.config();
 
+import "./config/cronJob";
+
 const app: Express = express();
 const port = process.env.PORT || 3000;
 const mongoURI = process.env.MONGO_URI;
@@ -19,7 +21,7 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(
   cors({
-    origin: ["http://localhost:5173"], // frontend origin
+    origin: ["http://localhost:5173"],
     credentials: true,
   })
 );

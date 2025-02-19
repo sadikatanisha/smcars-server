@@ -20,6 +20,10 @@ export interface ICar extends Document {
   price: number;
   sellerId: mongoose.Schema.Types.ObjectId;
   status: string;
+  //
+  auctionStatus?: "none" | "in_auction" | "sold";
+  currentAuction?: mongoose.Schema.Types.ObjectId;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,8 +93,19 @@ const CarSchema: Schema<ICar> = new Schema(
 
     status: {
       type: String,
-      enum: ["pending", "approved"],
+      enum: ["pending", "approved", "rejected"],
       default: "pending",
+    },
+
+    // to tract auction
+    auctionStatus: {
+      type: String,
+      enum: ["none", "in_auction", "sold"],
+      default: "none",
+    },
+    currentAuction: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Auction",
     },
   },
   {
