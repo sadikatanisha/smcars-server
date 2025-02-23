@@ -16,12 +16,14 @@ export const authMiddleware = async (
   next: NextFunction
 ) => {
   const authHeader = req.headers.authorization;
+
   if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
 
   const token = authHeader.split(" ")[1];
+
   try {
     const decodedToken = await getAuth().verifyIdToken(token);
     const user = await User.findOne({ uid: decodedToken.uid });

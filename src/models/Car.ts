@@ -19,10 +19,11 @@ export interface ICar extends Document {
   description: string;
   price: number;
   sellerId: mongoose.Schema.Types.ObjectId;
-  status: string;
+  status: "pending" | "approved" | "rejected";
   //
   auctionStatus?: "none" | "in_auction" | "sold";
   currentAuction?: mongoose.Schema.Types.ObjectId;
+  auctionCount: number; // Tracks how many auctions this car has been in
 
   createdAt: Date;
   updatedAt: Date;
@@ -106,6 +107,10 @@ const CarSchema: Schema<ICar> = new Schema(
     currentAuction: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auction",
+    },
+    auctionCount: {
+      type: Number,
+      default: 0,
     },
   },
   {

@@ -5,6 +5,7 @@ import User from "../models/User";
 import mongoose from "mongoose";
 import Auction from "../models/Auction";
 
+const { Types } = mongoose;
 // @desc    Create car
 // @route   POST /api/seller/create-car
 // @access  Public
@@ -96,6 +97,103 @@ export const createCar = async (
   }
 };
 
+// @desc    Edit car details (only if not approved)
+// @route   PUT /api/seller/edit-car/:id
+// @access  Private (seller only)
+export const editCar = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const sellerId = req.user._id;
+
+    if (!sellerId) {
+      res
+        .status(400)
+        .json({ success: false, message: "Seller ID is required" });
+      return;
+    }
+
+    // Find the car by its ID
+    const car = await Car.findById(id);
+    if (!car) {
+      res.status(404).json({ success: false, message: "Car not found" });
+      return;
+    }
+
+    // Disallow edits if the car has been approved
+    if (car.status === "approved") {
+      res.status(400).json({
+        success: false,
+        message: "Car has been approved and cannot be edited",
+      });
+      return;
+    }
+
+    // Check that the seller owns the car
+    if (car.sellerId.toString() !== sellerId.toString()) {
+      res.status(403).json({
+        success: false,
+        message: "Unauthorized: Car does not belong to seller",
+      });
+      return;
+    }
+
+    // Build an update object from the request body
+    const updateFields: any = {};
+    const fields = [
+      "carName",
+      "brand",
+      "modelYear",
+      "engine",
+      "gearBox",
+      "mileage",
+      "fuelType",
+      "condition",
+      "color",
+      "airConditioning",
+      "price",
+      "description",
+    ];
+    fields.forEach((field) => {
+      if (req.body[field] !== undefined) {
+        updateFields[field] = req.body[field];
+      }
+    });
+
+    // If new image files are uploaded, process them via Cloudinary and update images
+    const files = req.files as Express.Multer.File[];
+    if (files && files.length > 0) {
+      const imageUploads = await Promise.all(
+        files.map(async (file) => {
+          const result = await cloudinary.uploader.upload(file.path, {
+            folder: "cars",
+          });
+          return { url: result.secure_url, public_id: result.public_id };
+        })
+      );
+      updateFields.images = imageUploads;
+    }
+
+    const updatedCar = await Car.findByIdAndUpdate(id, updateFields, {
+      new: true,
+    });
+
+    res.status(200).json({ success: true, car: updatedCar });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error("Error editing car:", error.message);
+      res.status(500).json({ success: false, message: error.message });
+    } else {
+      res
+        .status(500)
+        .json({ success: false, message: "An unknown error occurred" });
+    }
+  }
+};
+
 // @desc    Get cars by seller
 // @route   GET /api/seller/my-cars
 // @access  Private
@@ -124,6 +222,44 @@ export const getMyCars = async (req: Request, res: Response): Promise<void> => {
   } catch (error: unknown) {
     if (error instanceof Error) {
       console.error("Error fetching seller cars:", error.message);
+      res.status(500).json({ success: false, message: error.message });
+    } else {
+      res
+        .status(500)
+        .json({ success: false, message: "An unknown error occurred" });
+    }
+  }
+};
+
+// @desc    Get a single car details by ID
+// @route   GET /api/seller/my-cars/:id
+// @access  Private
+
+export const getMyCarById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      res.status(400).json({ success: false, message: "Car ID is required" });
+      return;
+    }
+
+    // Find the car and populate seller details
+    const car = await Car.findById(id).exec();
+
+    if (!car) {
+      res.status(404).json({ success: false, message: "Car not found" });
+      return;
+    }
+
+    // Return the car details
+    res.status(200).json({ success: true, car });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error("Error fetching car details:", error.message);
       res.status(500).json({ success: false, message: error.message });
     } else {
       res
@@ -225,9 +361,17 @@ export const createAuction = async (
       startTime,
       endTime,
       reservePrice,
-      status: "scheduled", // initial status
+      status: "scheduled",
     });
     const savedAuction = await auction.save();
+
+    // update car data to tract auction
+    await Car.findByIdAndUpdate(car, {
+      $inc: { auctionCount: 1 },
+      auctionStatus: "in_auction",
+      currentAuction: auction._id,
+    });
+    console.log(car);
     res.status(201).json(savedAuction);
   } catch (error: unknown) {
     res
