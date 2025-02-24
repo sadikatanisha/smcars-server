@@ -5,6 +5,7 @@ import {
   logout,
   getUser,
   getUserInfo,
+  updateUserProfile,
 } from "../controllers/user.controller";
 import { authMiddleware } from "../middlewares/authMiddleware";
 
@@ -16,5 +17,7 @@ router.post("/logout", logout);
 
 router.get("/:uid", authMiddleware, getUser);
 router.get("/me/:uid", authMiddleware, getUserInfo);
+router.put("/update-profile", authMiddleware, updateUserProfile);
+router.put("/update-password", authMiddleware, updateUserProfile);
 
 export default router;

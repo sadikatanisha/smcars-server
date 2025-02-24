@@ -7,6 +7,7 @@ import cors from "cors";
 import connectDB from "./config/db";
 import userRoutes from "./routes/user.route";
 import sellerRoutes from "./routes/seller.route";
+import buyerRoutes from "./routes/buyer.route";
 import subscriptionRoute from "./routes/subscription.route";
 import adminRoute from "./routes/admin.route";
 dotenv.config();
@@ -35,6 +36,7 @@ app.get("/", (req: Request, res: Response) => {
 // Routes
 app.use("/api/users", userRoutes);
 app.use("/api/seller", sellerRoutes);
+app.use("/api/buyer", buyerRoutes);
 app.use("/api/subscriptions", subscriptionRoute);
 app.use("/api/admin", adminRoute);
 

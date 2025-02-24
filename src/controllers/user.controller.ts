@@ -242,12 +242,95 @@ export const getUserInfo: RequestHandler<{ uid: string }> = async (
       res.status(404).json({ message: "User not found" });
       return;
     }
-    console.log(user);
     res.status(200).json(user);
     return;
   } catch (error) {
     console.error("Error fetching user details:", error);
     res.status(500).json({ message: "Internal server error" });
     return;
+  }
+};
+
+// @desc    Update user profile
+// @route   PUT /api/users/update-profile
+// @access  Private
+export const updateUserProfile = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { userId, contact, presentAddress, permanentAddress, city } = req.body;
+
+  try {
+    // Find the user
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+
+    // Update basic fields
+    user.contact = contact || user.contact;
+    user.presentAddress = presentAddress || user.presentAddress;
+    user.permanentAddress = permanentAddress || user.permanentAddress;
+    user.city = city || user.city;
+
+    // Save updated user
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        presentAddress: user.presentAddress,
+        permanentAddress: user.permanentAddress,
+        city: user.city,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating user profile:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// @desc    Update user password
+// @route   PUT /api/users/update-password
+// @access  Private
+
+export const updateUserPassword = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { userId, currentPassword, newPassword } = req.body;
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+    if (currentPassword && newPassword) {
+      // Verify current password
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        res
+          .status(400)
+          .json({ success: false, message: "Current password is incorrect" });
+        return;
+      }
+
+      // Hash new password
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(newPassword, salt);
+      await user.save();
+      res.status(200).json({
+        success: true,
+        message: "Profile updated successfully",
+      });
+    }
+  } catch (error) {
+    console.error("Error updating user password:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };

@@ -13,6 +13,11 @@ export interface IUser extends Document {
   subscriptionRenewalDate?: Date;
   carsListed: mongoose.Types.ObjectId[];
   carsBidded: mongoose.Types.ObjectId[];
+
+  presentAddress: string;
+  permanentAddress: string;
+  city: string;
+
   createdAt: Date;
   updatedAt: Date;
 }
@@ -84,6 +89,21 @@ const UserSchema: Schema<IUser> = new Schema(
         ref: "Car",
       },
     ],
+    presentAddress: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    permanentAddress: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    city: {
+      type: String,
+      default: "",
+      trim: true,
+    },
   },
   {
     timestamps: true,

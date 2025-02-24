@@ -269,6 +269,68 @@ export const getMyCarById = async (
   }
 };
 
+// @desc    Request car approval (change status from on_hold to pending)
+// @route   PUT /api/seller/request-approval/:id
+// @access  Private (seller only)
+
+export const requestCarApproval = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const sellerId = req.user._id;
+
+    if (!sellerId) {
+      res
+        .status(400)
+        .json({ success: false, message: "Seller ID is required" });
+      return;
+    }
+
+    // Find the car by its ID
+    const car = await Car.findById(id);
+    if (!car) {
+      res.status(404).json({ success: false, message: "Car not found" });
+      return;
+    }
+
+    // Check that the seller owns the car
+    if (car.sellerId.toString() !== sellerId.toString()) {
+      res.status(403).json({
+        success: false,
+        message: "Unauthorized: Car does not belong to seller",
+      });
+      return;
+    }
+
+    // Ensure the car is in the 'on_hold' state before allowing the status change
+    if (car.status !== "on_hold") {
+      res.status(400).json({
+        success: false,
+        message:
+          "Car is not in 'on_hold' state and cannot be sent for approval",
+      });
+      return;
+    }
+
+    // Update the car status to 'pending'
+    car.status = "pending";
+    const updatedCar = await car.save();
+
+    res.status(200).json({ success: true, car: updatedCar });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      console.error("Error requesting car approval:", error.message);
+      res.status(500).json({ success: false, message: error.message });
+    } else {
+      res
+        .status(500)
+        .json({ success: false, message: "An unknown error occurred" });
+    }
+  }
+};
+
 // @desc    Get car listing limit by seller
 // Helper function
 
