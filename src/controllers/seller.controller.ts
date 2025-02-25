@@ -33,6 +33,7 @@ export const createCar = async (
       price,
       description,
       sellerId,
+      contactInfo,
     } = req.body;
 
     const files = req.files as Express.Multer.File[];
@@ -65,6 +66,7 @@ export const createCar = async (
       description,
       sellerId,
       images: imageUploads,
+      contactInfo,
     });
 
     const savedCar = await car.save({ session });
@@ -308,8 +310,7 @@ export const requestCarApproval = async (
     if (car.status !== "on_hold") {
       res.status(400).json({
         success: false,
-        message:
-          "Car is not in 'on_hold' state and cannot be sent for approval",
+        message: "Car has been already sent sent for approval.",
       });
       return;
     }

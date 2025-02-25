@@ -254,6 +254,7 @@ export const getUserInfo: RequestHandler<{ uid: string }> = async (
 // @desc    Update user profile
 // @route   PUT /api/users/update-profile
 // @access  Private
+
 export const updateUserProfile = async (
   req: Request,
   res: Response

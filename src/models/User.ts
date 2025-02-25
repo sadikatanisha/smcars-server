@@ -18,6 +18,8 @@ export interface IUser extends Document {
   permanentAddress: string;
   city: string;
 
+  // status
+  accountStatus: "pending" | "requested" | "verified" | "banned";
   createdAt: Date;
   updatedAt: Date;
 }
@@ -103,6 +105,11 @@ const UserSchema: Schema<IUser> = new Schema(
       type: String,
       default: "",
       trim: true,
+    },
+    accountStatus: {
+      type: String,
+      enum: ["pending", "requsted", "verified", "banned"],
+      default: "pending",
     },
   },
   {

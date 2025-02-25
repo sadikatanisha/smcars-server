@@ -25,6 +25,11 @@ export interface ICar extends Document {
   currentAuction?: mongoose.Schema.Types.ObjectId;
   auctionCount: number;
 
+  contactInfo: {
+    phone?: string;
+    location?: string;
+    city?: string;
+  };
   createdAt: Date;
   updatedAt: Date;
 }
@@ -111,6 +116,19 @@ const CarSchema: Schema<ICar> = new Schema(
     auctionCount: {
       type: Number,
       default: 0,
+    },
+
+    // contact info
+    contactInfo: {
+      phone: {
+        type: String,
+      },
+      location: {
+        type: String,
+      },
+      city: {
+        type: String,
+      },
     },
   },
   {
