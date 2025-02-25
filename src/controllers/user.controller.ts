@@ -335,3 +335,48 @@ export const updateUserPassword = async (
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
+
+export const submitVerification = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(401).json({ message: "Unauthorized" });
+      return;
+    }
+
+    // Extract the updated fields from the request body.
+    const { phone, address } = req.body;
+    if (!phone || !address) {
+      res.status(400).json({ message: "Phone and address are required" });
+      return;
+    }
+
+    // Update the user's contact and presentAddress fields and change accountStatus
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        contact: phone,
+        presentAddress: address,
+        accountStatus: "pending",
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser) {
+      res.status(404).json({ message: "User not found" });
+      return;
+    }
+
+    res.status(200).json({
+      message: "Verification submitted successfully",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Error submitting verification:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

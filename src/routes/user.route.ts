@@ -6,6 +6,7 @@ import {
   getUser,
   getUserInfo,
   updateUserProfile,
+  submitVerification,
 } from "../controllers/user.controller";
 import { authMiddleware } from "../middlewares/authMiddleware";
 
@@ -19,5 +20,6 @@ router.get("/:uid", authMiddleware, getUser);
 router.get("/me/:uid", authMiddleware, getUserInfo);
 router.put("/update-profile", authMiddleware, updateUserProfile);
 router.put("/update-password", authMiddleware, updateUserProfile);
+router.patch("/submit-verification", authMiddleware, submitVerification);
 
 export default router;
