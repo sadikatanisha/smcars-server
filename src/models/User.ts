@@ -108,7 +108,7 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     accountStatus: {
       type: String,
-      enum: ["pending", "requsted", "verified", "banned"],
+      enum: ["pending", "requested", "verified", "banned"],
       default: "pending",
     },
   },

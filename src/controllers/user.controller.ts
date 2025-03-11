@@ -84,7 +84,7 @@ export const signup = async (
     const idToken = await firebaseAuth.createCustomToken(firebaseUser.uid);
 
     res.status(201).json({
-      message: "User registered successfully. Please verify your email.",
+      message: "Registration & login successful.",
       user: {
         email: newUser.email,
         name: newUser.name,

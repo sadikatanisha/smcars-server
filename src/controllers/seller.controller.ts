@@ -434,7 +434,7 @@ export const createAuction = async (
       auctionStatus: "in_auction",
       currentAuction: auction._id,
     });
-    console.log(car);
+
     res.status(201).json(savedAuction);
   } catch (error: unknown) {
     res
