@@ -25,13 +25,49 @@ export const getAllAuctionCars = async (
   res: Response
 ): Promise<void> => {
   try {
-    // Fetch all auctions regardless of their status
-    const auctions = await Auction.find().populate("car");
+    const auctions = await Auction.aggregate([
+      // 1. Sort by startTime descending to get latest first
+      { $sort: { startTime: -1 } },
 
-    res.status(200).json({ success: true, auctions });
+      // 2. Group by car ID to get only the latest auction
+      {
+        $group: {
+          _id: "$car",
+          latestAuction: { $first: "$$ROOT" },
+        },
+      },
+
+      // 3. Replace root to work with the auction document
+      { $replaceRoot: { newRoot: "$latestAuction" } },
+
+      // 4. Populate car details using lookup
+      {
+        $lookup: {
+          from: "cars", // collection name
+          localField: "car",
+          foreignField: "_id",
+          as: "car",
+        },
+      },
+
+      // 5. Unwind the car array created by lookup
+      { $unwind: "$car" },
+
+      // 6. Optional: Filter out deleted cars
+      { $match: { "car._id": { $exists: true } } },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: auctions.length,
+      auctions,
+    });
   } catch (error: any) {
-    console.error("Error fetching all auction cars:", error.message);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error fetching auction cars:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch auction cars",
+    });
   }
 };
 
@@ -121,6 +157,107 @@ export const checkBiddingLimit = async (
   const remaining = biddingLimit - currentCount;
 
   return { remaining, limit: biddingLimit, used: currentCount };
+};
+
+// @desc    Get winning auctions
+// @route   GET /api/buyer/my-wins
+// @access  Private (Buyer)
+export const getMyWins = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user._id;
+
+    // 1. Find all ended auctions where user has winning bids
+    const winningAuctions = await Auction.aggregate([
+      {
+        $match: {
+          status: "ended",
+          "bids.bidder": userId,
+        },
+      },
+
+      { $unwind: "$bids" },
+
+      {
+        $sort: {
+          "bids.amount": -1,
+        },
+      },
+
+      {
+        $group: {
+          _id: "$_id",
+          auction: { $first: "$$ROOT" },
+          maxBid: { $max: "$bids.amount" },
+          winningBid: {
+            $first: {
+              $cond: [{ $eq: ["$bids.bidder", userId] }, "$bids", null],
+            },
+          },
+        },
+      },
+
+      {
+        $match: {
+          "winningBid.amount": { $eq: "$maxBid" },
+          "auction.reservePrice": { $lte: "$maxBid" },
+        },
+      },
+      // Lookup car details
+      {
+        $lookup: {
+          from: "cars",
+          localField: "auction.car",
+          foreignField: "_id",
+          as: "car",
+        },
+      },
+      { $unwind: "$car" },
+      // Lookup seller details
+      {
+        $lookup: {
+          from: "users",
+          localField: "auction.seller",
+          foreignField: "_id",
+          as: "seller",
+        },
+      },
+      { $unwind: "$seller" },
+      // Project final structure
+      {
+        $project: {
+          _id: 1,
+          finalPrice: "$maxBid",
+          car: {
+            _id: "$car._id",
+            carName: "$car.carName",
+            brand: "$car.brand",
+            images: "$car.images",
+          },
+          seller: {
+            _id: "$seller._id",
+            name: "$seller.name",
+            contact: "$seller.contact",
+          },
+          auctionEnd: "$auction.endTime",
+          reserveMet: {
+            $gte: ["$maxBid", "$auction.reservePrice"],
+          },
+        },
+      },
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: winningAuctions.length,
+      data: winningAuctions,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // @desc    Place bid

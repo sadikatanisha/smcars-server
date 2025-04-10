@@ -16,7 +16,9 @@ import {
   getAllUsers,
   getApprovedCars,
   getBannedUsers,
+  getCarAuctionDetails,
   getSingleUserDetails,
+  messages,
   rejectCar,
   verifyUser,
 } from "../controllers/admin.controller";
@@ -39,10 +41,13 @@ router.patch("/verify-user/:userId", verifyUser);
 router.patch("/ban-user/:userId", banUser);
 router.delete("/delete-car", deleteCar);
 
+router.get("/messages", messages);
+
 //car related
 router.get("/allCars", getAllCars);
 router.get("/get-approved-cars", getApprovedCars);
 router.get("/listing/:id", getAdminCarDetails);
+router.get("/car-auction-details/:carId", getCarAuctionDetails);
 router.patch("/approve-car/:carId", approveCar);
 router.patch("/reject-car/:carId", rejectCar);
 export default router;

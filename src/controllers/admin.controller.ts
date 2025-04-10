@@ -3,6 +3,7 @@ import Car from "../models/Car";
 import User from "../models/User";
 import Auction from "../models/Auction";
 import mongoose from "mongoose";
+import Leads from "../models/Leads";
 
 // @desc    Get All Users
 // @route   GET /api/admin/allUsers
@@ -280,12 +281,6 @@ export const createAuctionAdmin = async (
   res: Response
 ): Promise<void> => {
   try {
-    // Admin check (assuming req.user is populated via middleware)
-    // if (!req.user || !req.user.isAdmin) {
-    //   res.status(403).json({ message: "Access denied. Admins only." });
-    //   return;
-    // }
-
     const { car, seller, startTime, endTime, reservePrice } = req.body;
 
     // Validate required fields
@@ -389,5 +384,123 @@ export const getApprovedCars = async (
   } catch (error) {
     console.error("Error fetching banned users:", error);
     res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// @desc    Get latest auction details by car ID
+// @route   GET /api/admin/car-auction-details/:carId
+// @access  Private (Admin)
+export const getCarAuctionDetails = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { carId } = req.params;
+
+    // Get the latest auction for the car
+    const auction = await Auction.findOne({ car: carId })
+      .sort({ startTime: -1 }) // Get most recent auction first
+      .populate({
+        path: "car",
+        select: "carName brand modelYear mileage fuelType images status",
+      })
+      .populate({
+        path: "seller",
+        select: "name email contact accountStatus",
+      })
+      .populate({
+        path: "bids.bidder",
+        select: "name email contact role accountStatus",
+        model: "User",
+      })
+      .lean();
+
+    if (!auction) {
+      res.status(404).json({
+        success: false,
+        message: "No auctions found for this car",
+      });
+      return;
+    }
+
+    // Enrich bidder data (same as before)
+    const enhancedBids = auction.bids.map((bid: any) => ({
+      ...bid,
+      bidder: {
+        ...bid.bidder,
+        totalBids: Array.isArray(bid.bidder?.carsBidded)
+          ? bid.bidder.carsBidded.length
+          : 0,
+        auctionsWon: Array.isArray(bid.bidder?.carsBidded)
+          ? bid.bidder.carsBidded.filter((c: any) => c.auctionStatus === "sold")
+              .length
+          : 0,
+      },
+    }));
+
+    // Sort bids (same as before)
+    const sortedBids = enhancedBids.sort((a, b) => {
+      if (b.amount === a.amount) {
+        return (
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+      }
+      return b.amount - a.amount;
+    });
+
+    // Calculate stats (same as before)
+    const auctionStats = {
+      totalBids: auction.bids.length,
+      uniqueBidders: new Set(auction.bids.map((b) => b.bidder?._id)).size,
+      highestBid: Math.max(...auction.bids.map((b) => b.amount)),
+      reserveMet:
+        auction.reservePrice <= Math.max(...auction.bids.map((b) => b.amount)),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...auction,
+        bids: sortedBids,
+        statistics: auctionStats,
+        car: auction.car,
+        seller: auction.seller,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching car auction details:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch auction details",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
+  }
+};
+
+// @desc    Get contact requests
+// @route   GET /api/admin/messages
+// @access  Private (Admin)
+
+export const messages = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    // Fetch all contact messages and sort them with the newest on top
+    const allMessages = await Leads.find().sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: allMessages.length,
+      data: allMessages,
+    });
+  } catch (error: any) {
+    console.error("Error fetching messages:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch contact requests",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined,
+    });
   }
 };

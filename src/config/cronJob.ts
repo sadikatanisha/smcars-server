@@ -16,59 +16,66 @@ cron.schedule("* * * * *", async () => {
     });
 
     console.log(`⏳ Auctions to activate: ${auctionsToActivate.length}`);
+    await Promise.all(
+      auctionsToActivate.map(async (auction) => {
+        await Auction.updateOne(
+          { _id: auction._id },
+          { $set: { status: "active" } }
+        );
+      })
+    );
 
-    for (const auction of auctionsToActivate) {
-      console.log(`🔹 Activating auction ${auction._id}`);
-      await Auction.updateOne(
-        { _id: auction._id },
-        { $set: { status: "active" } }
-      );
-    }
-
-    // Find all scheduled/active auctions that should have ended
-    const auctionsToEnd: IAuction[] = await Auction.find({
+    // Find ending auctions
+    const endingAuctions: IAuction[] = await Auction.find({
       status: { $in: ["scheduled", "active"] },
       endTime: { $lte: now },
     });
 
-    console.log(`⏳ Auctions to end: ${auctionsToEnd.length}`);
+    console.log(`⏳ Processing ${endingAuctions.length} ending auctions`);
 
-    for (const auction of auctionsToEnd) {
-      console.log(`🔹 Ending auction ${auction._id} (was: ${auction.status})`);
+    await Promise.all(
+      endingAuctions.map(async (auction) => {
+        // Update auction status first
+        await Auction.updateOne(
+          { _id: auction._id },
+          { $set: { status: "ended" } }
+        );
 
-      // Update auction status to "ended"
-      await Auction.updateOne(
-        { _id: auction._id },
-        { $set: { status: "ended" } }
-      );
+        // Find associated car
+        const car: ICar | null = await Car.findOne({
+          currentAuction: auction._id,
+        });
 
-      // Find the associated car
-      const car: ICar | null = await Car.findOne({
-        currentAuction: auction._id,
-      });
+        if (!car) {
+          console.log(`🚨 No car found for auction ${auction._id}`);
+          return;
+        }
 
-      if (car) {
-        console.log(`🚗 Found car ${car._id} linked to auction ${auction._id}`);
+        // Check if reserve price was met
+        const maxBid =
+          auction.bids.length > 0
+            ? Math.max(...auction.bids.map((b) => b.amount))
+            : 0;
 
-        if (auction.bids.length > 0) {
-          // If bids exist, consider it sold
+        const reserveMet = maxBid >= auction.reservePrice;
+
+        if (reserveMet) {
           console.log(
-            `🏆 Auction ${auction._id} had bids, marking car as sold.`
+            `🏆 Auction ${auction._id} met reserve (${maxBid}/${auction.reservePrice})`
           );
           car.auctionStatus = "sold";
+          car.currentAuction = undefined;
         } else {
-          // If no bids, reset to no auction
-          console.log(`❌ Auction ${auction._id} had no bids, resetting car.`);
+          console.log(
+            `❌ Reserve not met for ${auction._id} (${maxBid}/${auction.reservePrice})`
+          );
           car.auctionStatus = "none";
           car.currentAuction = undefined;
         }
 
         await car.save();
-        console.log(
-          `✅ Car ${car._id} updated: auctionStatus=${car.auctionStatus}`
-        );
-      }
-    }
+      })
+    );
 
     console.log("✅ Auction update process completed.");
   } catch (error) {

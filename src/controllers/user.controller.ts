@@ -5,6 +5,7 @@ import BuyerSubscription from "../models/BuyerSubscription";
 import SellerSubscription from "../models/SellerSubscription";
 import bcrypt from "bcrypt";
 import { getAuth } from "firebase-admin/auth";
+import Leads from "../models/Leads";
 
 // @desc    Signup user
 // @route   POST /api/users/signup
@@ -86,6 +87,7 @@ export const signup = async (
     res.status(201).json({
       message: "Registration & login successful.",
       user: {
+        uid: firebaseUser.uid,
         email: newUser.email,
         name: newUser.name,
         _id: newUser._id,
@@ -336,6 +338,7 @@ export const updateUserPassword = async (
   }
 };
 
+// submit account verification by adding address and contact information
 export const submitVerification = async (
   req: Request,
   res: Response,
@@ -377,6 +380,46 @@ export const submitVerification = async (
     });
   } catch (error) {
     console.error("Error submitting verification:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+// @desc    Update user password
+// @route   PUT /api/users/send-message
+// @access  Public
+
+export const sendMessage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { name, email, contactNo, message } = req.body;
+
+    // Validate required fields
+    if (!name || !contactNo) {
+      res.status(400).json({
+        success: false,
+        message: "Name and contact number are required.",
+      });
+      return;
+    }
+
+    // Create a new lead
+    const lead = await Leads.create({
+      name,
+      email,
+      contactNo,
+      message,
+    });
+
+    res.status(201).json({
+      success: true,
+      data: lead,
+      message: "Your message has been sent successfully.",
+    });
+  } catch (error: any) {
+    console.error("Error in sendMessage controller:", error.message);
     res.status(500).json({ message: "Internal server error" });
   }
 };

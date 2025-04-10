@@ -5,7 +5,6 @@ import User from "../models/User";
 import mongoose from "mongoose";
 import Auction from "../models/Auction";
 
-const { Types } = mongoose;
 // @desc    Create car
 // @route   POST /api/seller/create-car
 // @access  Public
@@ -80,7 +79,7 @@ export const createCar = async (
       throw new Error("Seller not found");
     }
 
-    await session.commitTransaction(); // Commit the transaction
+    await session.commitTransaction();
 
     res.status(201).json({ success: true, car: savedCar });
   } catch (error: unknown) {

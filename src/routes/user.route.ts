@@ -7,6 +7,7 @@ import {
   getUserInfo,
   updateUserProfile,
   submitVerification,
+  sendMessage,
 } from "../controllers/user.controller";
 import { authMiddleware } from "../middlewares/authMiddleware";
 
@@ -15,6 +16,8 @@ const router = Router();
 router.post("/signup", signup);
 router.post("/login", login);
 router.post("/logout", logout);
+
+router.post("/send-message", sendMessage);
 
 router.get("/:uid", authMiddleware, getUser);
 router.get("/me/:uid", authMiddleware, getUserInfo);

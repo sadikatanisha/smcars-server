@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from "mongoose";
+import { IUser } from "./User";
 
 // Interface for Auction Document
 export interface IAuction extends Document {
@@ -9,7 +10,7 @@ export interface IAuction extends Document {
   reservePrice: number;
   currentBid?: number;
   bids: {
-    bidder: mongoose.Schema.Types.ObjectId;
+    bidder: mongoose.Types.ObjectId | IUser;
     amount: number;
     timestamp: Date;
   }[];

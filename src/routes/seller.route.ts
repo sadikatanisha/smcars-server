@@ -18,9 +18,7 @@ router.post("/create-car", upload.array("images"), createCar);
 router.put("/edit-car/:id", upload.array("images"), editCar);
 router.get("/my-cars", getMyCars);
 router.get("/my-cars/:id", getMyCarById);
-
 router.put("/request-car-approval/:id", requestCarApproval);
-
 router.get("/check-limit/:userId", async (req, res, next) => {
   try {
     const { userId } = req.params;
@@ -31,7 +29,6 @@ router.get("/check-limit/:userId", async (req, res, next) => {
   }
 });
 
-// Auction
 router.post("/create-auction", createAuction);
 
 export default router;
