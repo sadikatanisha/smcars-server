@@ -263,6 +263,7 @@ export const getMyWins = async (
 // @desc    Place bid
 // @route   PATCH /api/buyer/place-bid/:carId
 // @access  Private (Seller)
+
 export const placeBid = async (req: Request, res: Response): Promise<void> => {
   try {
     const { auctionId, amount } = req.body;
@@ -357,13 +358,40 @@ export const placeBid = async (req: Request, res: Response): Promise<void> => {
 };
 
 // @desc    Get bidded cars
-// @route   PATCH /api/buyer/bidded-cars
+// @route   GET /api/buyer/bidded-cars
 // @access  Private (Seller)
+
+interface FormattedBid {
+  amount: number;
+  timestamp: Date;
+}
+
+interface FormattedCar {
+  _id: string;
+  carName: string;
+  brand: string;
+  images: Array<{ url: string; public_id: string }>;
+}
+
+interface FormattedSeller {
+  name: string;
+  contact: string;
+}
+
+interface FormattedAuction {
+  _id: string;
+  car: FormattedCar;
+  seller: FormattedSeller;
+  startTime: Date;
+  endTime: Date;
+  status: string;
+  currentBid?: number;
+  bids: FormattedBid[];
+}
 
 export const getBiddedCars = async (
   req: Request,
-  res: Response,
-  next: NextFunction
+  res: Response
 ): Promise<void> => {
   try {
     if (!req.user) {
@@ -373,7 +401,6 @@ export const getBiddedCars = async (
       return;
     }
 
-    // Optionally, check if the user has the "seller" role (if only sellers are allowed)
     if (req.user.role !== "buyer") {
       res
         .status(403)
@@ -381,36 +408,38 @@ export const getBiddedCars = async (
       return;
     }
 
-    // Get the user by ID and populate their "carsBidded" array with car details.
-    const user = await User.findById(req.user._id)
-      .populate({
-        path: "carsBidded",
-        populate: [
-          {
-            path: "currentAuction",
-            model: "Auction",
-          },
-        ],
-      })
-      .lean()
-      .exec();
-    console.log(user);
-    if (!user) {
-      res.status(404).json({ message: "User not found." });
-      return;
-    }
-    const biddedCars = user.carsBidded.map((car: any) => ({
-      _id: car._id,
-      carName: car.carName,
-      image: car.images[0],
-      lastBid: car.currentAuction?.currentBid || 0,
-      status: car.currentAuction?.status || "Unknown",
+    const auctions = await Auction.find({ "bids.bidder": req.user._id })
+      .populate<{ car: ICar }>("car")
+      .populate<{ seller: IUser }>("seller")
+      .lean();
+
+    const formattedAuctions: FormattedAuction[] = auctions.map((auction) => ({
+      _id: auction._id.toString(),
+      car: {
+        _id: auction.car._id.toString(),
+        carName: auction.car.carName,
+        brand: auction.car.brand,
+        images: auction.car.images,
+      },
+      seller: {
+        name: auction.seller.name,
+        contact: auction.seller.contact,
+      },
+      startTime: auction.startTime,
+      endTime: auction.endTime,
+      status: auction.status,
+      currentBid: auction.currentBid,
+      bids: auction.bids
+        .filter((bid) => bid.bidder.toString() === req.user!._id.toString())
+        .map((bid) => ({
+          amount: bid.amount,
+          timestamp: bid.timestamp,
+        })),
     }));
 
-    // Return the populated bidded cars list
-    res.status(200).json({ biddedCars });
+    res.status(200).json({ auctionsWithBids: formattedAuctions });
   } catch (error) {
-    console.error("Error fetching bidded cars:", error);
-    res.status(500).json({ message: "Internal server error." });
+    console.error("Error:", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

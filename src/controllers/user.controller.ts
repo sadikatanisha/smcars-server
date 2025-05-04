@@ -98,7 +98,7 @@ export const signup = async (
     });
   } catch (error) {
     console.log("An error occurred creating the user", error);
-    next(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
@@ -164,7 +164,7 @@ export const login = async (
     });
   } catch (error) {
     console.error("An error occurred during login:", error);
-    next(error);
+    res.status(500).json({ message: "Internal server error" });
   }
 };
 
