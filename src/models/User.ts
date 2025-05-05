@@ -74,7 +74,7 @@ const UserSchema: Schema<IUser> = new Schema(
       },
       default: null,
     },
-    // Field to track when the subscription was renewed
+
     subscriptionRenewalDate: {
       type: Date,
       default: Date.now,

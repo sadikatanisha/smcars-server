@@ -303,7 +303,6 @@ export const createAuctionAdmin = async (
       return;
     }
 
-    // Check if there's an existing auction for this car that is scheduled or active
     const existingAuction = await Auction.findOne({
       car,
       seller,
@@ -317,7 +316,6 @@ export const createAuctionAdmin = async (
       return;
     }
 
-    // Verify the car exists, is approved for auction, and belongs to the provided seller
     const carData = await Car.findById(car);
     if (!carData) {
       res.status(404).json({ message: "Car not found" });
@@ -355,7 +353,6 @@ export const createAuctionAdmin = async (
       },
       { new: true }
     );
-    console.log("saved car", savedCar);
     res.status(201).json(savedAuction);
   } catch (error: unknown) {
     console.error("Error during auction creation:", error);
@@ -375,11 +372,11 @@ export const getApprovedCars = async (
 ): Promise<void> => {
   try {
     const approvedCars = await Car.find({ status: "approved" })
-      .select("carName price status sellerId auctionStatus")
+      .select("carName price status sellerId auctionStatus auctionCount")
       .slice("images", 1)
       .populate("sellerId", "name email")
       .exec();
-    console.log(approvedCars);
+
     res.status(200).json({ approvedCars });
   } catch (error) {
     console.error("Error fetching banned users:", error);
@@ -477,10 +474,34 @@ export const getCarAuctionDetails = async (
   }
 };
 
+// @desc    Get latest a cars auction history
+// @route   GET /api/admin/car-auction-history/:carId
+// @access  Private (Admin)
+export const getCarAuctionHistory = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { carId } = req.params;
+    const auctions = await Auction.find({ car: carId })
+      .sort({ startTime: -1 })
+      .populate("car", "carName brand images")
+      .populate("seller", "name email")
+      .populate("bids.bidder", "name email")
+      .lean();
+
+    res.status(200).json({ success: true, auctions });
+  } catch (err: any) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, message: "Could not load auction history" });
+  }
+};
+
 // @desc    Get contact requests
 // @route   GET /api/admin/messages
 // @access  Private (Admin)
-
 export const messages = async (
   req: Request,
   res: Response,

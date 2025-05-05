@@ -17,6 +17,7 @@ import {
   getApprovedCars,
   getBannedUsers,
   getCarAuctionDetails,
+  getCarAuctionHistory,
   getSingleUserDetails,
   messages,
   rejectCar,
@@ -48,6 +49,7 @@ router.get("/allCars", getAllCars);
 router.get("/get-approved-cars", getApprovedCars);
 router.get("/listing/:id", getAdminCarDetails);
 router.get("/car-auction-details/:carId", getCarAuctionDetails);
+router.get("/car-auction-history/:carId", getCarAuctionHistory);
 router.patch("/approve-car/:carId", approveCar);
 router.patch("/reject-car/:carId", rejectCar);
 export default router;
