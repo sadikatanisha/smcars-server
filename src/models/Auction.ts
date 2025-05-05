@@ -14,7 +14,7 @@ export interface IAuction extends Document {
     amount: number;
     timestamp: Date;
   }[];
-  status: "scheduled" | "active" | "ended" | "relisted";
+  status: "scheduled" | "active" | "ended";
 }
 
 // Auction Schema

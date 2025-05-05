@@ -325,7 +325,7 @@ export const createAuctionAdmin = async (
       res.status(400).json({ message: "Car is not approved for auction" });
       return;
     }
-    // Optional: Validate that the seller provided matches the car's owner
+
     if (carData.sellerId.toString() !== seller) {
       res
         .status(400)
@@ -344,7 +344,6 @@ export const createAuctionAdmin = async (
     });
     const savedAuction = await auction.save();
 
-    // Update car data to track the auction
     const savedCar = await Car.findByIdAndUpdate(
       car,
       {
