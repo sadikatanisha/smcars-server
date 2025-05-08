@@ -59,5 +59,12 @@ const AuctionSchema: Schema<IAuction> = new Schema(
   { timestamps: true }
 );
 
+AuctionSchema.index(
+  { car: 1, status: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { status: { $in: ["scheduled", "active"] } },
+  }
+);
 const Auction = mongoose.model<IAuction>("Auction", AuctionSchema);
 export default Auction;

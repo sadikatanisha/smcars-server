@@ -1,84 +1,60 @@
+// src/config/cronJob.ts
 import cron from "node-cron";
-import Auction, { IAuction } from "../models/Auction";
-import Car, { ICar } from "../models/Car";
+import mongoose from "mongoose";
+import Auction from "../models/Auction";
+import Car from "../models/Car";
+import { Server as SocketIOServer } from "socket.io";
 
-cron.schedule("* * * * *", async () => {
-  console.log("🔄 Cron job running...");
+/**
+ * Start scheduled auction status updates.
+ * @param io Socket.IO server instance
+ */
 
-  try {
+export function startCronJobs(io: SocketIOServer) {
+  cron.schedule("*/1 * * * *", async () => {
     const now = new Date();
+    console.log(`Cron running at ${now.toISOString()}`);
 
-    // Activate scheduled auctions that should become active
-    const auctionsToActivate = await Auction.find({
-      status: "scheduled",
-      startTime: { $lte: now },
-      endTime: { $gt: now },
-    });
-
-    console.log(`⏳ Auctions to activate: ${auctionsToActivate.length}`);
-    await Promise.all(
-      auctionsToActivate.map(async (auction) => {
-        await Auction.updateOne(
-          { _id: auction._id },
-          { $set: { status: "active" } }
-        );
-      })
+    const { modifiedCount } = await Auction.updateMany(
+      { status: "scheduled", startTime: { $lte: now } },
+      { $set: { status: "active" } }
     );
+    if (modifiedCount > 0) {
+      console.log(`Activated ${modifiedCount} auctions`);
+      io.emit("auctionStarted");
+    }
 
-    // Find ending auctions
-    const endingAuctions: IAuction[] = await Auction.find({
-      status: { $in: ["scheduled", "active"] },
+    const ending = await Auction.find({
+      status: "active",
       endTime: { $lte: now },
     });
+    console.log(`Auctions to end: ${ending.length}`);
 
-    console.log(`⏳ Processing ${endingAuctions.length} ending auctions`);
-
-    await Promise.all(
-      endingAuctions.map(async (auction) => {
-        // Update auction status first
-        await Auction.updateOne(
-          { _id: auction._id },
-          { $set: { status: "ended" } }
-        );
-
-        // Find associated car
-        const car: ICar | null = await Car.findOne({
-          currentAuction: auction._id,
-        });
-
-        if (!car) {
-          console.log(`🚨 No car found for auction ${auction._id}`);
-          return;
-        }
-
-        // Check if reserve price was met
-        const maxBid =
-          auction.bids.length > 0
-            ? Math.max(...auction.bids.map((b) => b.amount))
-            : 0;
-
-        const reserveMet = maxBid >= auction.reservePrice;
-
-        if (reserveMet) {
-          console.log(
-            `🏆 Auction ${auction._id} met reserve (${maxBid}/${auction.reservePrice})`
+    const session = await mongoose.startSession();
+    try {
+      await session.withTransaction(async () => {
+        for (const auc of ending) {
+          await Auction.updateOne(
+            { _id: auc._id, status: "active" },
+            { $set: { status: "ended" } },
+            { session }
           );
-          car.auctionStatus = "sold";
-          car.currentAuction = undefined;
-        } else {
-          console.log(
-            `❌ Reserve not met for ${auction._id} (${maxBid}/${auction.reservePrice})`
-          );
-          car.auctionStatus = "none";
-          car.currentAuction = undefined;
+
+          const carUpdate =
+            (auc.currentBid ?? 0) >= auc.reservePrice
+              ? { auctionStatus: "sold", currentAuction: null }
+              : { auctionStatus: "none", currentAuction: null };
+
+          await Car.updateOne({ _id: auc.car }, carUpdate, { session });
+
+          io.emit("auctionEnded", { auctionId: auc._id });
         }
-
-        await car.save();
-      })
-    );
-
-    console.log("✅ Auction update process completed.");
-  } catch (error) {
-    console.error("❌ Error updating auction statuses:", error);
-  }
-});
+      });
+      console.log("Auction status update transaction complete");
+    } catch (err) {
+      console.error("Transaction failed", err);
+    } finally {
+      session.endSession();
+    }
+  });
+}

@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   checkBiddingLimit,
   getAllAuctionCars,
+  getAuctionById,
   getBiddedCars,
   getSingleCarDetails,
   placeBid,
@@ -13,6 +14,7 @@ const router = Router();
 
 router.get("/auction-cars", getAllAuctionCars);
 router.get("/auction-cars/:carId", getSingleCarDetails);
+router.get("/auction/:auctionId", getAuctionById);
 
 router.get("/check-bid-limit/:userId", async (req, res, next) => {
   try {

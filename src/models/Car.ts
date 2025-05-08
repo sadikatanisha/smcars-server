@@ -20,11 +20,9 @@ export interface ICar extends Document {
   price: number;
   sellerId: mongoose.Schema.Types.ObjectId;
   status: "on_hold" | "pending" | "approved" | "rejected";
-  //
   auctionStatus?: "none" | "in_auction" | "sold";
   currentAuction?: mongoose.Schema.Types.ObjectId;
   auctionCount: number;
-
   contactInfo: {
     phone?: string;
     location?: string;

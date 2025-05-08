@@ -2,18 +2,16 @@ import mongoose, { Schema, Document } from "mongoose";
 
 // Interface for User Document
 export interface IUser extends Document {
-  uid: string;
   name: string;
   email: string;
   password: string;
   picture: string;
-  role: string;
+  role: "buyer" | "seller" | "admin";
   contact: string;
   subscription: mongoose.Types.ObjectId;
   subscriptionRenewalDate?: Date;
   carsListed: mongoose.Types.ObjectId[];
   carsBidded: mongoose.Types.ObjectId[];
-
   presentAddress: string;
   permanentAddress: string;
   city: string;
@@ -29,12 +27,7 @@ const UserSchema: Schema<IUser> = new Schema(
   {
     name: {
       type: String,
-      required: [true, "Name is required"],
       trim: true,
-    },
-    uid: {
-      type: String,
-      required: [true, "Firebase ID is required"],
     },
     email: {
       type: String,
@@ -46,7 +39,6 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     password: {
       type: String,
-      required: [true, "Password is required"],
       minlength: [6, "Password must be at least 6 characters long"],
     },
     picture: {
@@ -61,20 +53,18 @@ const UserSchema: Schema<IUser> = new Schema(
     },
     contact: {
       type: String,
-      required: [true, "Contact number is required"],
       trim: true,
       match: [/^\+?\d{7,15}$/, "Please provide a valid contact number"],
     },
     subscription: {
       type: mongoose.Schema.Types.ObjectId,
       ref: function () {
-        return this.role === "buyer"
-          ? "BuyerSubscription"
-          : "SellerSubscription";
+        return this.role === "seller"
+          ? "SellerSubscription"
+          : "BuyerSubscription";
       },
       default: null,
     },
-
     subscriptionRenewalDate: {
       type: Date,
       default: Date.now,
@@ -116,6 +106,19 @@ const UserSchema: Schema<IUser> = new Schema(
     timestamps: true,
   }
 );
+
+UserSchema.pre("save", async function (next) {
+  if (this.isNew && !this.subscription) {
+    const ModelName =
+      this.role === "seller" ? "SellerSubscription" : "BuyerSubscription";
+    const SubModel = mongoose.model(ModelName);
+    const freeSub = await SubModel.findOne({ price: 0, tier: 1 });
+    if (freeSub) {
+      this.subscription = freeSub._id;
+    }
+  }
+  next();
+});
 
 const User = mongoose.model<IUser>("User", UserSchema);
 export default User;

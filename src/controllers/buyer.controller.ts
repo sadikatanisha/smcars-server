@@ -4,14 +4,12 @@ import Car, { ICar } from "../models/Car";
 import BuyerSubscription from "../models/BuyerSubscription";
 import User, { IUser } from "../models/User";
 import mongoose from "mongoose";
-import { Types } from "mongoose";
 
 export const getActiveAuctionCars = async (
   req: Request,
   res: Response
 ): Promise<void> => {
   try {
-    // Fetch auctions that are currently active
     const auctions = await Auction.find({ status: "active" }).populate("car");
     res.status(200).json({ success: true, auctions });
   } catch (error: any) {
@@ -26,34 +24,25 @@ export const getAllAuctionCars = async (
 ): Promise<void> => {
   try {
     const auctions = await Auction.aggregate([
-      // 1. Sort by startTime descending to get latest first
       { $sort: { startTime: -1 } },
-
-      // 2. Group by car ID to get only the latest auction
       {
         $group: {
           _id: "$car",
           latestAuction: { $first: "$$ROOT" },
         },
       },
-
-      // 3. Replace root to work with the auction document
       { $replaceRoot: { newRoot: "$latestAuction" } },
 
-      // 4. Populate car details using lookup
       {
         $lookup: {
-          from: "cars", // collection name
+          from: "cars",
           localField: "car",
           foreignField: "_id",
           as: "car",
         },
       },
 
-      // 5. Unwind the car array created by lookup
       { $unwind: "$car" },
-
-      // 6. Optional: Filter out deleted cars
       { $match: { "car._id": { $exists: true } } },
     ]);
 
@@ -68,6 +57,35 @@ export const getAllAuctionCars = async (
       success: false,
       message: "Failed to fetch auction cars",
     });
+  }
+};
+
+// GET   /api/buyer/auction/:auctionId
+export const getAuctionById = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const { auctionId } = req.params;
+
+  try {
+    // find the auction and populate the car & seller
+    const auction = await Auction.findById(auctionId)
+      .populate({
+        path: "car",
+        populate: { path: "sellerId", select: "name email" },
+      })
+      .populate("bids.bidder", "name")
+      .lean();
+
+    if (!auction) {
+      res.status(404).json({ success: false, message: "Auction not found" });
+      return;
+    }
+
+    res.status(200).json({ success: true, auction });
+  } catch (err: any) {
+    console.error("Error in getAuctionById:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -133,7 +151,6 @@ export const getSingleCarDetails = async (
 export const checkBiddingLimit = async (
   userId: string
 ): Promise<{ remaining: number; limit: number; used: number }> => {
-  // Fetch the user and populate the subscription details
   const user = await User.findById(userId).populate("subscription");
   if (!user || user.role !== "buyer") {
     throw new Error("User not found or not a buyer");
@@ -321,10 +338,6 @@ export const placeBid = async (req: Request, res: Response): Promise<void> => {
       });
       return;
     }
-
-    console.log("Auction:", auction.bids);
-    console.log("Bid Amount:", amount);
-    console.log("Current Bid or Reserve:", currentBidOrReserve);
 
     // Record the bid
     auction.bids.push({

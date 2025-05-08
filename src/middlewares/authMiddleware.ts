@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import User from "../models/User";
-import { getAuth } from "firebase-admin/auth";
-
+import jwt from "jsonwebtoken";
 declare global {
   namespace Express {
     interface Request {
@@ -16,23 +15,22 @@ export const authMiddleware = async (
   next: NextFunction
 ) => {
   const authHeader = req.headers.authorization;
-
   if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ message: "Unauthorized" });
     return;
   }
-
   const token = authHeader.split(" ")[1];
 
   try {
-    const decodedToken = await getAuth().verifyIdToken(token);
-    const user = await User.findOne({ uid: decodedToken.uid });
+    const decodedToken = jwt.verify(token, process.env.JWT_SECRET!) as {
+      email: string;
+    };
+    const user = await User.findOne({ email: decodedToken.email });
 
     if (!user) {
       res.status(404).json({ message: "User not found" });
       return;
     }
-
     req.user = user;
     next();
   } catch (error) {
